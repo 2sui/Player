@@ -174,6 +174,7 @@ public class Player: UIViewController {
     }
     
     public var bufferSize: Double = 10.0
+    public var bufferedTime: Double = 0
     public var playbackEdgeTriggered: Bool = true
 
     public var maximumDuration: NSTimeInterval! {
@@ -264,7 +265,7 @@ public class Player: UIViewController {
     public override func loadView() {
         self.playerView = PlayerView(frame: CGRectZero)
         self.playerView.fillMode = AVLayerVideoGravityResizeAspect
-        self.playerView.playerLayer.hidden = true
+//        self.playerView.playerLayer.hidden = true
         self.view = self.playerView
         self.playerView.layer.addObserver(self, forKeyPath: PlayerReadyForDisplay, options: ([NSKeyValueObservingOptions.New, NSKeyValueObservingOptions.Old]), context: &PlayerLayerObserverContext)
 
@@ -380,6 +381,8 @@ public class Player: UIViewController {
 
           NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(playerItemDidPlayToEndTime(_:)), name: AVPlayerItemDidPlayToEndTimeNotification, object: self.playerItem)
           NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(playerItemFailedToPlayToEndTime(_:)), name: AVPlayerItemFailedToPlayToEndTimeNotification, object: self.playerItem)
+            
+            self.bufferedTime = 0
         }
 
         self.player.replaceCurrentItemWithPlayerItem(self.playerItem)
@@ -442,7 +445,7 @@ public class Player: UIViewController {
         case (.Some(PlayerKeepUp), &PlayerItemObserverContext):
             if let item = self.playerItem {
                 self.bufferingState = .Ready
-
+                
                 if item.playbackLikelyToKeepUp && self.playbackState == .Playing {
                     self.playFromCurrentTime()
                 }
@@ -453,7 +456,6 @@ public class Player: UIViewController {
             switch (status) {
             case AVPlayerStatus.ReadyToPlay.rawValue:
                 self.playerView.player = self.player
-                self.playerView.playerLayer.hidden = false
             case AVPlayerStatus.Failed.rawValue:
                 self.playbackState = PlaybackState.Failed
             default:
@@ -470,8 +472,7 @@ public class Player: UIViewController {
 
             switch (status) {
             case AVPlayerStatus.ReadyToPlay.rawValue:
-                self.playerView.playerLayer.player = self.player
-                self.playerView.playerLayer.hidden = false
+                self.playerView.player = self.player
             case AVPlayerStatus.Failed.rawValue:
                 self.playbackState = PlaybackState.Failed
             default:
@@ -482,17 +483,16 @@ public class Player: UIViewController {
                 return
             }
             
+            let timerange = (change?[NSKeyValueChangeNewKey] as! NSArray)[0].CMTimeRangeValue
+            let currentTime = CMTimeGetSeconds(item.currentTime())
+            self.bufferedTime = CMTimeGetSeconds(CMTimeAdd(timerange.start, timerange.duration))
+            
             if self.playbackState != .Playing {
                 return
             }
             
-            self.bufferingState = .Ready
-            
-            let timerange = (change?[NSKeyValueChangeNewKey] as! NSArray)[0].CMTimeRangeValue
-            let bufferedTime = CMTimeGetSeconds(CMTimeAdd(timerange.start, timerange.duration))
-            let currentTime = CMTimeGetSeconds(item.currentTime())
-            
-            if bufferedTime - currentTime >= self.bufferSize {
+            if self.bufferedTime - currentTime >= self.bufferSize || self.bufferedTime >= self.maximumDuration {
+                self.bufferingState = .Ready
                 self.playFromCurrentTime()
             }
         case (.Some(PlayerReadyForDisplay), &PlayerLayerObserverContext):
@@ -526,6 +526,7 @@ internal class PlayerView: UIView {
         set {
             if (self.layer as! AVPlayerLayer).player != newValue {
                 (self.layer as! AVPlayerLayer).player = newValue
+                (self.layer as! AVPlayerLayer).hidden = false
             }
         }
     }
