@@ -159,7 +159,7 @@ public class Player: UIViewController {
     
     public var playbackState: PlaybackState! = .Stopped {
         didSet {
-            if playbackState != oldValue || !playbackEdgeTriggered {
+            if self.playbackState != oldValue || !self.playbackEdgeTriggered {
                 self.delegate?.playerPlaybackStateDidChange(self)
             }
         }
@@ -167,7 +167,7 @@ public class Player: UIViewController {
     
     public var bufferingState: BufferingState! = .Unknown {
         didSet {
-            if bufferingState != oldValue || !playbackEdgeTriggered {
+            if self.bufferingState != oldValue || !self.playbackEdgeTriggered {
                 self.delegate?.playerBufferingStateDidChange(self)
             }
         }
@@ -176,6 +176,7 @@ public class Player: UIViewController {
     public var bufferSize: Double = 10.0
     public var bufferedTime: Double = 0
     public var playbackEdgeTriggered: Bool = true
+    public var continuePlayAfterEnterForeground: Bool = true
 
     public var maximumDuration: NSTimeInterval! {
         get {
@@ -428,7 +429,7 @@ public class Player: UIViewController {
     }
   
     public func applicationWillEnterForeground(aNoticiation: NSNotification) {
-        if self.playbackState == .Paused {
+        if self.playbackState == .Paused && self.continuePlayAfterEnterForeground {
             self.playFromCurrentTime()
         }
     }
